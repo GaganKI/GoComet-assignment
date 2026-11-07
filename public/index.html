@@ -1,0 +1,337 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>British Auction RFQ</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --card: #fff;
+        --tx: #1a1d23;
+        --mut: #6b7280;
+        --bd: #e3e6eb;
+        --pr: #2457d6;
+        --ok: #15803d;
+        --no: #b91c1c;
+        --wa: #b45309;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111318;
+          --card: #1b1e25;
+          --tx: #e8eaed;
+          --mut: #9aa0ab;
+          --bd: #2c313b;
+          --pr: #6c93ff;
+          --ok: #4ade80;
+          --no: #f87171;
+          --wa: #fbbf24;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font: 14px system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--tx);
+      }
+
+      header {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        padding: 14px 24px;
+        background: var(--card);
+        border-bottom: 1px solid var(--bd);
+      }
+
+      header h1 {
+        font-size: 17px;
+        margin: 0;
+        flex: 1;
+      }
+
+      a {
+        color: var(--pr);
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      main {
+        max-width: 1050px;
+        margin: 20px auto;
+        padding: 0 16px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--bd);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid var(--bd);
+      }
+
+      th {
+        color: var(--mut);
+        font-weight: 500;
+      }
+
+      .wrap {
+        overflow-x: auto;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--mut);
+        margin-bottom: 3px;
+      }
+
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid var(--bd);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--tx);
+        font: inherit;
+      }
+
+      button {
+        background: var(--pr);
+        color: #fff;
+        border: 0;
+        cursor: pointer;
+        width: auto;
+        padding: 9px 18px;
+      }
+
+      .badge {
+        padding: 2px 9px;
+        border-radius: 99px;
+        font-size: 12px;
+        border: 1px solid currentColor;
+      }
+
+      .Active {
+        color: var(--ok);
+      }
+
+      .Closed {
+        color: var(--mut);
+      }
+
+      .Force {
+        color: var(--no);
+      }
+
+      .Upcoming {
+        color: var(--wa);
+      }
+
+      .err {
+        color: var(--no);
+        margin: 8px 0;
+      }
+
+      .mut {
+        color: var(--mut);
+      }
+
+      .ext {
+        color: var(--wa);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>British Auction RFQ</h1>
+      <a href="#/">Auctions</a>
+      <a href="#/new">+ New RFQ</a>
+    </header>
+
+    <main id="app"></main>
+
+    <script>
+      const $ = (s) => document.querySelector(s), app = $("#app");
+      const fmt = (d) => new Date(d).toLocaleString();
+      const money = (n) =>
+        n == null ? "—" : Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
+      const esc = (s) =>
+        String(s).replace(/[&<>\"]/g, (c) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          "\"": "&quot;"
+        }[c]));
+      const badge = (s) => `<span class="badge ${s.split(" ")[0]}">${s}</span>`;
+      let timer;
+
+      async function api(url, opt) {
+        const r = await fetch(
+          url,
+          opt && {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(opt)
+          }
+        );
+        const j = await r.json();
+        if (!r.ok) throw j.errors || ["Request failed"];
+        return j;
+      }
+
+      const errs = (e) => `<div class="err">${[].concat(e).map(esc).join("<br>")}</div>`;
+
+      async function list() {
+        const rows = await api("/api/rfqs");
+        app.innerHTML = `<div class="card wrap"><table><tr><th>RFQ</th><th>Lowest bid</th><th>Current close</th><th>Forced close</th><th>Status</th></tr>
+  ${rows
+    .map(
+      (r) => `<tr><td><a href="#/rfq/${r.id}">${esc(r.name)}</a><div class="mut">${esc(r.reference)}</div></td><td>${money(r.lowest_bid)}</td>
+  <td>${fmt(r.bid_close)}</td><td>${fmt(r.forced_close)}</td><td>${badge(r.status)}</td></tr>`
+    )
+    .join("") || "<tr><td colspan=5 class=\"mut\">No auctions yet</td></tr>"}</table></div>`;
+      }
+
+      function newForm() {
+        app.innerHTML = `<div class="card"><h3>Create RFQ (British Auction)</h3><div id="e"></div><div class="grid">
+  <div><label>Reference ID</label><input id="reference"></div><div><label>RFQ name</label><input id="name"></div>
+  <div><label>Bid start</label><input id="bid_start" type="datetime-local"></div><div><label>Bid close</label><input id="bid_close" type="datetime-local"></div>
+  <div><label>Forced close (later than bid close)</label><input id="forced_close" type="datetime-local"></div><div><label>Pickup / service date</label><input id="pickup_date" type="datetime-local"></div>
+  <div><label>Trigger window X (min)</label><input id="trigger_window_min" type="number" min="1" value="10"></div>
+  <div><label>Extension duration Y (min)</label><input id="extension_min" type="number" min="1" value="5"></div>
+  <div><label>Extension trigger</label><select id="trigger_type"><option value="BID_RECEIVED">Bid received in last X minutes</option>
+  <option value="ANY_RANK_CHANGE">Any supplier rank change in last X minutes</option><option value="L1_CHANGE">L1 rank change in last X minutes</option></select></div></div>
+  <p><button id="go">Create RFQ</button></p></div>`;
+
+        $("#go").onclick = async () => {
+          const b = {};
+          document.querySelectorAll("input,select").forEach((i) => (b[i.id] = i.value));
+          ["bid_start", "bid_close", "forced_close", "pickup_date"].forEach((k) => {
+            if (b[k]) b[k] = new Date(b[k]).toISOString();
+          });
+          try {
+            const r = await api("/api/rfqs", b);
+            location.hash = "#/rfq/" + r.id;
+          } catch (e) {
+            $("#e").innerHTML = errs(e);
+          }
+        };
+      }
+
+      async function details(id) {
+        const d = await api("/api/rfqs/" + id), r = d.rfq;
+        const active = document.activeElement?.id, keep = {};
+        document.querySelectorAll("#bidform input").forEach((i) => (keep[i.id] = i.value));
+
+        app.innerHTML = `<div class="card"><h3 style="margin-top:0">${esc(r.name)} <span class="mut">${esc(r.reference)}</span> ${badge(r.status)}</h3>
+  <div class="grid"><div><label>Current close</label>${fmt(r.bid_close)}</div><div><label>Forced close</label>${fmt(r.forced_close)}</div>
+  <div><label>Original close</label>${fmt(r.original_close)}</div><div><label>Pickup date</label>${fmt(r.pickup_date)}</div>
+  <div><label>Config</label>X=${r.trigger_window_min}m, Y=${r.extension_min}m<br>${r.trigger_type.replace(/_/g, " ")}</div>
+  <div><label>Time left</label><span id="cd"></span></div></div></div>
+  <div class="card wrap"><h3 style="margin-top:0">Supplier ranking</h3><table><tr><th>Rank</th><th>Carrier</th><th>Freight</th><th>Origin</th><th>Dest.</th><th>Total</th><th>Transit</th><th>Valid till</th></tr>
+  ${d.ranking
+    .map(
+      (b) => `<tr><td><b>${b.rank}</b></td><td>${esc(b.carrier)}</td><td>${money(b.freight)}</td><td>${money(b.origin_charges)}</td><td>${money(b.destination_charges)}</td>
+  <td><b>${money(b.total)}</b></td><td>${b.transit_days}d</td><td>${fmt(b.quote_validity)}</td></tr>`
+    )
+    .join("") || "<tr><td colspan=8 class=\"mut\">No bids yet</td></tr>"}</table></div>
+  ${
+    r.status === "Active"
+      ? `<div class="card" id="bidform"><h3 style="margin-top:0">Submit bid</h3><div id="be"></div><div class="grid">
+  <div><label>Carrier name</label><input id="carrier"></div><div><label>Freight charges</label><input id="freight" type="number" min="0"></div>
+  <div><label>Origin charges</label><input id="origin_charges" type="number" min="0"></div><div><label>Destination charges</label><input id="destination_charges" type="number" min="0"></div>
+  <div><label>Transit time (days)</label><input id="transit_days" type="number" min="1"></div><div><label>Quote validity</label><input id="quote_validity" type="datetime-local"></div></div>
+  <p><button id="bid">Submit bid</button></p></div>`
+      : ""
+  }
+  <div class="card wrap"><h3 style="margin-top:0">All bids (by price)</h3><table><tr><th>Carrier</th><th>Total</th><th>Placed at</th></tr>
+  ${d.bids
+    .map(
+      (b) => `<tr><td>${esc(b.carrier)}</td><td>${money(b.total)}</td><td>${fmt(b.created_at)}</td></tr>`
+    )
+    .join("") || "<tr><td colspan=3 class=\"mut\">—</td></tr>"}</table></div>
+  <div class="card"><h3 style="margin-top:0">Activity log</h3>${d.activity
+    .map(
+      (a) => `<div style="padding:5px 0;border-bottom:1px solid var(--bd)"><span class="mut">${fmt(a.created_at)}</span>
+  <b class="${a.type === "EXTENSION" ? "ext" : ""}">${a.type}</b> ${esc(a.message)}${
+        a.new_close ? ` <span class="mut">(${fmt(a.old_close)} → ${fmt(a.new_close)})</span>` : ""
+      }</div>`
+    )
+    .join("")}</div>`;
+
+        Object.entries(keep).forEach(([k, v]) => {
+          const e = $("#" + k);
+          if (e) e.value = v;
+        });
+        if (active && $("#" + active)) $("#" + active).focus();
+
+        const skew = new Date(d.server_time) - Date.now(), end = new Date(r.bid_close);
+        clearInterval(window.cdT);
+        window.cdT = setInterval(() => {
+          const s = Math.max(0, Math.floor((end - (Date.now() + skew)) / 1000));
+          const el = $("#cd");
+          if (el) el.textContent = `${Math.floor(s / 60)}m ${s % 60}s`;
+        }, 1000);
+
+        if ($("#bid"))
+          $("#bid").onclick = async () => {
+            const b = {};
+            document.querySelectorAll("#bidform input").forEach((i) => (b[i.id] = i.value));
+            if (b.quote_validity) b.quote_validity = new Date(b.quote_validity).toISOString();
+            try {
+              await api(`/api/rfqs/${id}/bids`, b);
+              details(id);
+            } catch (e) {
+              $("#be").innerHTML = errs(e);
+            }
+          };
+      }
+
+      function route() {
+        clearInterval(timer);
+        clearInterval(window.cdT);
+        const h = location.hash || "#/", m = h.match(/^#\/rfq\/(\d+)/);
+        if (m) {
+          details(m[1]);
+          timer = setInterval(() => details(m[1]), 5000);
+        } else if (h === "#/new") {
+          newForm();
+        } else {
+          list();
+          timer = setInterval(list, 5000);
+        }
+      }
+
+      addEventListener("hashchange", route);
+      route();
+    </script>
+  </body>
+</html>
